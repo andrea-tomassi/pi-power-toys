@@ -1,0 +1,54 @@
+{
+  "name": "pi-power-toys",
+  "version": "0.1.0",
+  "description": "Power-user customizations for the Pi coding agent — yellow session names in the footer, a /power-settings toggle menu, and more.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "power-toys",
+    "footer",
+    "customization"
+  ],
+  "pi": {
+    "extensions": ["./dist"]
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "pnpm typecheck && pnpm build"
+  },
+  "author": "Andrea Tomassi <andrea.tomassi@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrea-tomassi/pi-power-toys.git"
+  },
+  "homepage": "https://github.com/andrea-tomassi/pi-power-toys#readme",
+  "bugs": {
+    "url": "https://github.com/andrea-tomassi/pi-power-toys/issues"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.78.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.22.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
