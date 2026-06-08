@@ -2,12 +2,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { PowerToyFeature } from "./types.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { yellowSessionName } from "./features/yellow-session-name.js";
+import { fixChromeStealth } from "./features/fix-chrome-stealth.js";
 
 /**
  * Registry of all power-toy features.
  * Add new features here to make them available in /power-settings.
  */
-const features: PowerToyFeature[] = [yellowSessionName];
+const features: PowerToyFeature[] = [yellowSessionName, fixChromeStealth];
 
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
