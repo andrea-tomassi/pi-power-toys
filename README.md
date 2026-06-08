@@ -31,6 +31,8 @@ Opens an interactive toggle menu for all available features. Changes apply immed
 | Feature | Default | Description |
 |---------|---------|-------------|
 | **Yellow Session Name** | on | Shows named sessions in yellow in the footer, matching the session picker color |
+| **Fix Chrome Display** | on | Starts Xvfb virtual display so Chrome can launch on machines without a physical display |
+| **Compact Model** | off | Use a specific model for context compaction, independent of the active conversation model. Shows a model picker in /power-settings. Falls back to the session model if the configured model is unavailable |
 
 ## Adding a New Power Toy
 

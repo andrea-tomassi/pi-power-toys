@@ -10,7 +10,7 @@ const CONFIG_PATH = join(
 );
 
 export interface PowerToyConfig {
-  [featureId: string]: boolean;
+  [featureId: string]: boolean | string;
 }
 
 export async function loadConfig(): Promise<PowerToyConfig> {
