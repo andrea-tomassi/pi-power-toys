@@ -108,7 +108,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // /resume-named — pick a yellow (named) session to resume
-  pi.registerCommand("resume-named", {
+  pi.registerCommand("power-resume", {
     description: "Resume a named (yellow) session",
     handler: async (_args, ctx) => {
       if (!ctx.hasUI) return;
@@ -159,7 +159,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // /unname-session — remove the name from a yellow session
-  pi.registerCommand("unname-session", {
+  pi.registerCommand("power-unname", {
     description: "Remove the name from a named (yellow) session",
     handler: async (_args, ctx) => {
       if (!ctx.hasUI) return;
