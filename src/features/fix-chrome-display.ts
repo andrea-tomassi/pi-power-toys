@@ -60,11 +60,11 @@ function startXvfb(): boolean {
   }
 }
 
-export const fixChromeHeadless: PowerToyFeature = {
-  id: "fix-chrome-headless",
-  label: "Fix Chrome Headless",
+export const fixChromeDisplay: PowerToyFeature = {
+  id: "fix-chrome-display",
+  label: "Fix Chrome Display",
   description:
-    "Start Xvfb virtual display so pi-chrome-dev-tools can launch Chrome on headless machines (no $DISPLAY)",
+    "Start Xvfb virtual display so pi-chrome-dev-tools can launch Chrome on machines without a physical display",
   defaultValue: true,
 
   enable(pi: ExtensionAPI, _ctx: ExtensionContext) {
