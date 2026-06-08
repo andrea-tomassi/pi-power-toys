@@ -3,13 +3,12 @@ import type { PowerToyFeature } from "./types.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { yellowSessionName } from "./features/yellow-session-name.js";
 import { fixChromeDisplay } from "./features/fix-chrome-display.js";
-import { sessionResumeWizard } from "./features/session-resume-wizard.js";
 
 /**
  * Registry of all power-toy features.
  * Add new features here to make them available in /power-settings.
  */
-const features: PowerToyFeature[] = [yellowSessionName, fixChromeDisplay, sessionResumeWizard];
+const features: PowerToyFeature[] = [yellowSessionName, fixChromeDisplay];
 
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
