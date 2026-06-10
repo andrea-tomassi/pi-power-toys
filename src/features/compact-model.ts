@@ -130,6 +130,19 @@ export const compactModel: PowerToyFeature = {
 
 			// Serialize conversation
 			const conversationText = serializeConversation(convertToLlm(allMessages));
+
+			// Guard: if serialization is empty, fall back to default compaction.
+			// This happens when findCutPoint keeps nearly everything and
+			// the entries before the cut are all metadata (model_change,
+			// thinking_level_change, etc.) with no summarizable content.
+			if (!conversationText.trim()) {
+				ctx.ui.notify(
+					`[compact-model] Serialized conversation is empty (${tokensBefore.toLocaleString()} tokens reported, ${allMessages.length} messages). Falling back to default compaction.`,
+					"warning",
+				);
+				return;
+			}
+
 			const previousContext = previousSummary
 				? `\n\nPrevious session summary for context:\n${previousSummary}`
 				: "";
