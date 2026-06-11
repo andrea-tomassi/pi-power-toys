@@ -1,6 +1,9 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { execSync, spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
+import { existsSync, lstatSync, readlinkSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import type { PowerToyFeature } from "../types.js";
 
 let xvfbProcess: ChildProcess | null = null;
@@ -60,6 +63,49 @@ function startXvfb(): boolean {
   }
 }
 
+/**
+ * Removes the Chrome profile SingletonLock if it points to a stale PID.
+ *
+ * Problem: When Chrome (via pi-chrome-dev-tools) crashes or is killed,
+ * the SingletonLock symlink remains pointing to a dead PID like
+ * "hostname-123456". On the next launch, Playwright sees the lock
+ * and fails with "Chrome not found".
+ *
+ * Fix: Read the symlink, extract the trailing PID, check if it's alive.
+ * If dead, remove the lock so the next Chrome launch succeeds.
+ */
+function cleanStaleChromeLock(): void {
+  const lockPath = join(homedir(), ".chrome-dev-tools", "profile", "SingletonLock");
+
+  if (!existsSync(lockPath)) return;
+  if (!lstatSync(lockPath).isSymbolicLink()) return;
+
+  let target: string;
+  try {
+    target = readlinkSync(lockPath);
+  } catch {
+    return;
+  }
+
+  // Target format: "hostname-PID"
+  const match = target.match(/-(\d+)$/);
+  if (!match) return;
+
+  const pid = Number(match[1]);
+  try {
+    // kill(pid, 0) throws if the process doesn't exist
+    process.kill(pid, 0);
+    // Process is alive — lock is valid, leave it
+  } catch {
+    // Process is dead — stale lock, remove it
+    try {
+      unlinkSync(lockPath);
+    } catch {
+      // Best effort
+    }
+  }
+}
+
 export const fixChromeDisplay: PowerToyFeature = {
   id: "fix-chrome-display",
   label: "Fix Chrome Display",
@@ -77,6 +123,10 @@ export const fixChromeDisplay: PowerToyFeature = {
         }
       });
     }
+
+    pi.on("session_start", () => {
+      cleanStaleChromeLock();
+    });
   },
 
   disable() {
