@@ -3,13 +3,12 @@ import type { PowerToyFeature } from "./types.js";
 import { loadConfig, saveConfig } from "./config.js";
 import { yellowSessionName } from "./features/yellow-session-name.js";
 import { compactModel } from "./features/compact-model.js";
-import { customFooter } from "./features/custom-footer.js";
 
 /**
  * Registry of all power-toy features.
  * Add new features here to make them available in /power-settings.
  */
-const features: PowerToyFeature[] = [yellowSessionName, compactModel, customFooter];
+const features: PowerToyFeature[] = [yellowSessionName, compactModel];
 
 /**
  * Features that use a model selector instead of on/off toggle.
