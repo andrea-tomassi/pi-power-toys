@@ -10,7 +10,7 @@ export const hostnameFooter: PowerToyFeature = {
 
   enable(_pi: ExtensionAPI, ctx: ExtensionContext) {
     if (ctx.mode !== "tui") return;
-    ctx.ui.setStatus("host", `🖥 ${hostname()}`);
+    ctx.ui.setStatus("host", `🖥️  ${hostname()}`);
   },
 
   disable(_pi: ExtensionAPI, ctx: ExtensionContext) {
