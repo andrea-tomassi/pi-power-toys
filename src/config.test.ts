@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadConfig, saveConfig, type PowerToyConfig } from "./config.js";
+import { loadConfig, saveConfig, type PowerToyConfig } from "./config.ts";
 
 let tempDir: string;
 

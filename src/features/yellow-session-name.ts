@@ -2,7 +2,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { PowerToyFeature } from "../types.js";
+import type { PowerToyFeature } from "../types.ts";
 
 // --- Helpers (mirrors built-in footer utils) ---
 

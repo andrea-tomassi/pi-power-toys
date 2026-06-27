@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { PowerToyFeature } from "../types.js";
+import type { PowerToyFeature } from "../types.ts";
 
 export const hostnameFooter: PowerToyFeature = {
   id: "hostname-footer",

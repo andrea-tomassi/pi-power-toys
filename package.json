@@ -1,14 +1,14 @@
 {
   "name": "pi-power-toys",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Power-user customizations for the Pi coding agent — yellow session names in the footer, a /power-settings toggle menu, and more.",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "files": [
-    "dist",
+    "index.ts",
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "pi",
@@ -25,14 +25,11 @@
     ]
   },
   "scripts": {
-    "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write \"src/**/*.ts\" \"index.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"index.ts\"",
-    "dev": "tsx src/index.ts",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+    "format:check": "prettier --check \"src/**/*.ts\" \"index.ts\""
   },
   "author": "Andrea Tomassi <andrea.tomassi@gmail.com>",
   "license": "MIT",
@@ -52,11 +49,9 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.0",
     "@types/node": "^22.0.0",
-    "tsx": "^4.22.0",
     "typescript": "^5.7.0",
     "vitest": "^4.0.0",
-    "prettier": "^3.0.0",
-    "vitest": "^4.1.9"
+    "prettier": "^3.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

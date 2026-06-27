@@ -83,10 +83,9 @@ const features: PowerToyFeature[] = [
 
 That's it — `/power-settings` will automatically show the new toggle, and it'll activate on the next session start (or immediately if toggled on).
 
-### 3. Build & test
+### 3. Test
 
 ```bash
-npm run build          # compile to dist/
 npm test               # run unit tests
 # then restart pi or /reload
 ```
@@ -123,7 +122,7 @@ Settings are persisted in `~/.pi/agent/pi-power-toys.json`:
 Read/write via `src/config.ts` helpers:
 
 ```ts
-import { loadConfig, saveConfig } from "./config";
+import { loadConfig, saveConfig } from "./config.ts";
 
 const cfg = await loadConfig();    // { "yellow-session-name": true, ... }
 cfg["my-feature"] = true;
@@ -135,15 +134,16 @@ await saveConfig(cfg);             // creates parent dirs, writes JSON
 ```
 pi-power-toys/
 ├── package.json            # npm + pi manifest (pi-package keyword, pi.extensions)
-├── tsconfig.json           # ESM, Node 20+, strict
+├── tsconfig.json           # ESNext, bundler resolution, allowImportingTsExtensions
 ├── .editorconfig           # Editor formatting rules
 ├── .prettierrc             # Code formatter config
 ├── .gitignore
 ├── LICENSE
 ├── CHANGELOG.md
 ├── README.md
+├── index.ts                # Root entry point — re-exports from src/
 ├── src/
-│   ├── index.ts            # Entry point — loads config, registers /power-settings, enables features
+│   ├── index.ts            # Loads config, registers /power-settings, enables features
 │   ├── config.ts           # Persist/load settings from ~/.pi/agent/pi-power-toys.json
 │   ├── config.test.ts      # Config I/O tests
 │   ├── types.ts            # PowerToyFeature interface
@@ -152,14 +152,14 @@ pi-power-toys/
 │       ├── compact-model.ts        # Feature: model selector for context compaction
 │       ├── compact-model.test.ts   # parseModelKey tests
 │       └── hostname-footer.ts      # Feature: hostname in footer status line
-└── dist/                   # build output (gitignored)
 ```
+
+Pi loads extensions from TypeScript source via jiti — no compilation step needed.
 
 ## Publishing
 
 ```bash
-npm run prepublishOnly   # typecheck + test + build
-npm publish              # publishes dist/ only (see "files" in package.json)
+npm publish              # publishes TypeScript source (no build step needed)
 ```
 
 The `"pi-package"` keyword in `package.json` makes this appear on [pi.dev/packages](https://pi.dev/packages).

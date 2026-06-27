@@ -1,9 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { PowerToyFeature } from "./types.js";
-import { loadConfig, saveConfig } from "./config.js";
-import { yellowSessionName } from "./features/yellow-session-name.js";
-import { compactModel } from "./features/compact-model.js";
-import { hostnameFooter } from "./features/hostname-footer.js";
+import type { PowerToyFeature } from "./types.ts";
+import { loadConfig, saveConfig } from "./config.ts";
+import { yellowSessionName } from "./features/yellow-session-name.ts";
+import { compactModel } from "./features/compact-model.ts";
+import { hostnameFooter } from "./features/hostname-footer.ts";
 
 /**
  * Registry of all power-toy features.

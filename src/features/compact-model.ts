@@ -1,8 +1,8 @@
 import { complete } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
-import type { PowerToyFeature } from "../types.js";
-import { loadConfig } from "../config.js";
+import type { PowerToyFeature } from "../types.ts";
+import { loadConfig } from "../config.ts";
 
 /**
  * Parse a model key "provider:model_id" into [provider, modelId].

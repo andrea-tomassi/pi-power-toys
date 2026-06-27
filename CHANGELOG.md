@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-27
+
+### Changed
+- **Breaking:** Ship TypeScript source only — no compiled `dist/`. Pi loads extensions via jiti from source
+- Switch all internal imports from `.js` to `.ts` extensions (required for jiti resolution)
+- tsconfig: `module: ESNext`, `moduleResolution: bundler`, `allowImportingTsExtensions: true`
+- Remove `main`, `types`, `build` script, `tsx` dev dependency
+
 ## [0.1.2] - 2026-06-27
 
 ### Fixed
