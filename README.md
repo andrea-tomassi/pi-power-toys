@@ -1,5 +1,8 @@
 # ⚡ Pi Power Toys
 
+[![CI](https://github.com/andrea-tomassi/pi-power-toys/actions/workflows/ci.yml/badge.svg)](https://github.com/andrea-tomassi/pi-power-toys/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Custom power-user features for the [Pi coding agent](https://pi.dev). Each feature can be toggled on/off via the `/power-settings` menu and persists across restarts.
 
 ## Install
@@ -32,6 +35,9 @@ Opens an interactive toggle menu for all available features. Changes apply immed
 |---------|---------|-------------|
 | **Yellow Session Name** | on | Shows named sessions in yellow in the footer, matching the session picker color |
 | **Compact Model** | off | Use a specific model for context compaction, independent of the active conversation model. Shows a model picker in /power-settings. Falls back to the session model if the configured model is unavailable |
+| **Hostname in Footer** | on | Show the machine hostname in the footer status line |
+
+See the [CHANGELOG](CHANGELOG.md) for release history.
 
 ## Adding a New Power Toy
 
@@ -81,6 +87,7 @@ That's it — `/power-settings` will automatically show the new toggle, and it'l
 
 ```bash
 npm run build          # compile to dist/
+npm test               # run unit tests
 # then restart pi or /reload
 ```
 
@@ -120,7 +127,7 @@ import { loadConfig, saveConfig } from "./config";
 
 const cfg = await loadConfig();    // { "yellow-session-name": true, ... }
 cfg["my-feature"] = true;
-await saveConfig(cfg);             // atomic write
+await saveConfig(cfg);             // creates parent dirs, writes JSON
 ```
 
 ## Project Structure
@@ -129,22 +136,29 @@ await saveConfig(cfg);             // atomic write
 pi-power-toys/
 ├── package.json            # npm + pi manifest (pi-package keyword, pi.extensions)
 ├── tsconfig.json           # ESM, Node 20+, strict
+├── .editorconfig           # Editor formatting rules
+├── .prettierrc             # Code formatter config
 ├── .gitignore
+├── LICENSE
+├── CHANGELOG.md
 ├── README.md
 ├── src/
 │   ├── index.ts            # Entry point — loads config, registers /power-settings, enables features
 │   ├── config.ts           # Persist/load settings from ~/.pi/agent/pi-power-toys.json
+│   ├── config.test.ts      # Config I/O tests
 │   ├── types.ts            # PowerToyFeature interface
 │   └── features/
 │       ├── yellow-session-name.ts  # Feature: yellow session names in footer
-│       └── compact-model.ts        # Feature: model selector for context compaction
+│       ├── compact-model.ts        # Feature: model selector for context compaction
+│       ├── compact-model.test.ts   # parseModelKey tests
+│       └── hostname-footer.ts      # Feature: hostname in footer status line
 └── dist/                   # build output (gitignored)
 ```
 
 ## Publishing
 
 ```bash
-npm run prepublishOnly   # typecheck + build
+npm run prepublishOnly   # typecheck + test + build
 npm publish              # publishes dist/ only (see "files" in package.json)
 ```
 
@@ -152,4 +166,4 @@ The `"pi-package"` keyword in `package.json` makes this appear on [pi.dev/packag
 
 ## License
 
-MIT
+[MIT](LICENSE)

@@ -11,9 +11,7 @@ function formatCwdForFooter(cwd: string, home: string): string {
   const resolvedCwd = resolve(cwd);
   const resolvedHome = resolve(home);
   const rel = relative(resolvedHome, resolvedCwd);
-  const isInside =
-    rel === "" ||
-    (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+  const isInside = rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
   if (!isInside) return cwd;
   return rel === "" ? "~" : `~${sep}${rel}`;
 }
@@ -27,7 +25,10 @@ function formatTokens(count: number): string {
 }
 
 function sanitizeStatusText(text: string): string {
-  return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+  return text
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
 }
 
 // --- Feature ---
@@ -35,8 +36,7 @@ function sanitizeStatusText(text: string): string {
 export const yellowSessionName: PowerToyFeature = {
   id: "yellow-session-name",
   label: "Yellow Session Name",
-  description:
-    "Show named sessions in yellow in the footer, matching the session picker color",
+  description: "Show named sessions in yellow in the footer, matching the session picker color",
   defaultValue: true,
 
   enable(pi: ExtensionAPI, ctx: ExtensionContext) {
@@ -70,8 +70,7 @@ export const yellowSessionName: PowerToyFeature = {
 
           // --- Context usage ---
           const contextUsage = ctx.getContextUsage();
-          const contextWindow =
-            contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+          const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
           const contextPercentValue = contextUsage?.percent ?? 0;
           const contextPercent =
             contextUsage?.percent !== null && contextUsage?.percent !== undefined
@@ -101,9 +100,7 @@ export const yellowSessionName: PowerToyFeature = {
           if (totalCacheRead) statsParts.push(`R${formatTokens(totalCacheRead)}`);
           if (totalCacheWrite) statsParts.push(`W${formatTokens(totalCacheWrite)}`);
 
-          const usingSubscription = ctx.model
-            ? ctx.modelRegistry.isUsingOAuth(ctx.model)
-            : false;
+          const usingSubscription = ctx.model ? ctx.modelRegistry.isUsingOAuth(ctx.model) : false;
           if (totalCost || usingSubscription) {
             const costStr = `$${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
             statsParts.push(costStr);

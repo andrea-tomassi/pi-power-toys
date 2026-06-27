@@ -54,33 +54,34 @@ export default function (pi: ExtensionAPI) {
         const container = new Container();
 
         // Header
-        container.addChild(
-          new Text(theme.fg("accent", theme.bold("\u26a1 Pi Power Toys")), 1, 0),
-        );
+        container.addChild(new Text(theme.fg("accent", theme.bold("\u26a1 Pi Power Toys")), 1, 0));
 
         // Build settings items — model-selector features get a model list, others get on/off
-        const items = features.map((feature): { id: string; label: string; currentValue: string; values: string[] } => {
-          if (MODEL_SELECTOR_FEATURES.has(feature.id)) {
-            // Build model list from available models
-            const availableModels = ctx.modelRegistry.getAvailable();
-            const modelKeys = availableModels.map((m) => `${m.provider}:${m.id}`);
-            const rawCfg = cfg[feature.id];
-            const currentValue: string = typeof rawCfg === "string" ? rawCfg : "off";
+        const items = features.map(
+          (feature): { id: string; label: string; currentValue: string; values: string[] } => {
+            if (MODEL_SELECTOR_FEATURES.has(feature.id)) {
+              // Build model list from available models
+              const availableModels = ctx.modelRegistry.getAvailable();
+              const modelKeys = availableModels.map((m) => `${m.provider}:${m.id}`);
+              const rawCfg = cfg[feature.id];
+              const currentValue: string = typeof rawCfg === "string" ? rawCfg : "off";
+              return {
+                id: feature.id,
+                label: feature.label,
+                currentValue,
+                values: ["off", ...modelKeys],
+              };
+            }
+            const val =
+              typeof cfg[feature.id] === "boolean" ? cfg[feature.id] : feature.defaultValue;
             return {
               id: feature.id,
               label: feature.label,
-              currentValue,
-              values: ["off", ...modelKeys],
+              currentValue: String(val ? "on" : "off"),
+              values: ["on", "off"],
             };
-          }
-          const val = typeof cfg[feature.id] === "boolean" ? cfg[feature.id] : feature.defaultValue;
-          return {
-            id: feature.id,
-            label: feature.label,
-            currentValue: String(val ? "on" : "off"),
-            values: ["on", "off"],
-          };
-        });
+          },
+        );
 
         const settingsList = new SettingsList(
           items,
@@ -124,10 +125,7 @@ export default function (pi: ExtensionAPI) {
         // Help text
         container.addChild(
           new Text(
-            theme.fg(
-              "dim",
-              "\u2191\u2193 navigate \u2022 enter toggle \u2022 esc close",
-            ),
+            theme.fg("dim", "\u2191\u2193 navigate \u2022 enter toggle \u2022 esc close"),
             1,
             0,
           ),
@@ -143,6 +141,4 @@ export default function (pi: ExtensionAPI) {
       });
     },
   });
-
-
 }

@@ -20,13 +20,19 @@
     "customization"
   ],
   "pi": {
-    "extensions": ["./index.ts"]
+    "extensions": [
+      "./index.ts"
+    ]
   },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.ts\" \"index.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"index.ts\"",
     "dev": "tsx src/index.ts",
-    "prepublishOnly": "pnpm typecheck && pnpm build"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "author": "Andrea Tomassi <andrea.tomassi@gmail.com>",
   "license": "MIT",
@@ -47,7 +53,10 @@
     "@earendil-works/pi-coding-agent": "^0.78.0",
     "@types/node": "^22.0.0",
     "tsx": "^4.22.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0",
+    "prettier": "^3.0.0",
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=20.0.0"
