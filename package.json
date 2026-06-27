@@ -1,6 +1,6 @@
 {
   "name": "pi-power-toys",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Power-user customizations for the Pi coding agent — yellow session names in the footer, a /power-settings toggle menu, and more.",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,7 @@
     ]
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

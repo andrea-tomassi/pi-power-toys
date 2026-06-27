@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-27
+
+### Fixed
+- Clean `dist/` before build to prevent stale artifacts from reverted features in npm tarball
+
 ## [0.1.0] - 2026-06-08
 
 ### Added
@@ -17,5 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration persistence in `~/.pi/agent/pi-power-toys.json`
 - Pluggable feature architecture via `PowerToyFeature` interface
 
-[Unreleased]: https://github.com/andrea-tomassi/pi-power-toys/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/andrea-tomassi/pi-power-toys/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/andrea-tomassi/pi-power-toys/releases/tag/v0.1.1
 [0.1.0]: https://github.com/andrea-tomassi/pi-power-toys/releases/tag/v0.1.0
