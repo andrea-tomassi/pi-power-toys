@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { PowerToyFeature } from "../types.ts";
 import { loadConfig, saveConfig } from "../config.ts";
@@ -24,13 +26,89 @@ export interface CustomProvidersConfig {
   "custom-providers"?: CustomProviderDef[];
 }
 
+// ── Paths ──────────────────────────────────────────────────────────────────
+
+function authJsonPath(): string {
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  return join(home, ".pi", "agent", "auth.json");
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function register(pi: ExtensionAPI, def: CustomProviderDef): void {
+  pi.registerProvider(def.id, {
+    name: def.name ?? def.id,
+    baseUrl: def.baseUrl,
+    api: def.api ?? "openai-completions",
+    models: def.models.length > 0
+      ? def.models.map((m) => ({
+          id: m.id,
+          name: m.name ?? m.id,
+          reasoning: false,
+          input: m.vision ? (["text", "image"] as const) : (["text"] as const),
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: m.contextWindow ?? 128000,
+          maxTokens: m.maxTokens ?? 32768,
+        }))
+      : [
+          {
+            id: "discovering...",
+            name: "Run /discover-models after /login",
+            reasoning: false,
+            input: ["text"] as const,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 128000,
+            maxTokens: 4096,
+          },
+        ],
+  });
+}
+
+async function readAuthKey(providerId: string): Promise<string | undefined> {
+  try {
+    const raw = await readFile(authJsonPath(), "utf8");
+    const auth = JSON.parse(raw) as Record<string, { type: string; key: string }>;
+    return auth[providerId]?.key;
+  } catch {
+    return undefined;
+  }
+}
+
+async function discoverModels(
+  baseUrl: string,
+  apiKey?: string,
+): Promise<{ models: DiscoveredModel[]; error?: string }> {
+  const url = `${baseUrl}/models`;
+  const headers: Record<string, string> = {};
+  if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  try {
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return { models: [], error: `HTTP ${res.status}` };
+
+    const body = (await res.json()) as {
+      data?: Array<{ id: string }>;
+    };
+
+    if (!body.data || !Array.isArray(body.data) || body.data.length === 0) {
+      return { models: [], error: "No models in response" };
+    }
+
+    return {
+      models: body.data.map((m) => ({ id: m.id, name: m.id, vision: false })),
+    };
+  } catch (err) {
+    return { models: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ── Feature ────────────────────────────────────────────────────────────────
 
 export const customProviders: PowerToyFeature = {
   id: "custom-providers",
   label: "Custom Providers",
   description:
-    "Register custom API providers that appear in /login for API key entry. Models are auto-discovered from the endpoint.",
+    "Register custom API providers. Use /add-provider, then /login, then /discover-models.",
   defaultValue: true,
 
   enable(pi: ExtensionAPI, ctx: ExtensionContext) {
@@ -40,154 +118,72 @@ export const customProviders: PowerToyFeature = {
         const cfg = (await loadConfig()) as CustomProvidersConfig;
         const providers = cfg["custom-providers"] ?? [];
         for (const p of providers) {
-          pi.registerProvider(p.id, {
-            name: p.name ?? p.id,
-            baseUrl: p.baseUrl,
-            api: p.api ?? "openai-completions",
-            models: p.models.map((m) => ({
-              id: m.id,
-              name: m.name ?? m.id,
-              reasoning: false,
-              input: m.vision ? (["text", "image"] as const) : (["text"] as const),
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              contextWindow: m.contextWindow ?? 128000,
-              maxTokens: m.maxTokens ?? 32768,
-            })),
-          });
+          register(pi, p);
         }
         if (providers.length > 0) {
           ctx.ui.notify(
-            `[power-toys] \u2190 ${providers.length} custom provider(s) loaded`,
+            `[power-toys] ${providers.length} custom provider(s) loaded`,
             "info",
           );
         }
       } catch {
-        // First run — no saved config
+        // first run
       }
     })();
 
-    // ── /add-provider command ───────────────────────────────────────────
+    // ── /add-provider ───────────────────────────────────────────────────
     pi.registerCommand("add-provider", {
-      description: "Add a custom provider. Models are auto-discovered from the endpoint.",
+      description: "Add a custom provider (just name + URL). Then /login to set API key.",
       handler: async (_args, ctx) => {
         if (ctx.mode !== "tui") {
           ctx.ui.notify("run /add-provider from the pi prompt", "info");
           return;
         }
 
-        // 1. Ask for provider ID
         const id = await ctx.ui.input("Provider ID (e.g. my-server):");
-        if (!id || !id.trim()) {
+        if (!id?.trim()) {
           ctx.ui.notify("Cancelled", "info");
           return;
         }
-        const providerId = id.trim();
 
-        // 2. Ask for display name
-        const displayName = await ctx.ui.input("Display name (optional, e.g. My Server):");
+        const displayName = await ctx.ui.input("Display name (optional):");
 
-        // 3. Ask for base URL
         const baseUrl = await ctx.ui.input("Base URL (e.g. https://example.com/v1):");
-        if (!baseUrl || !baseUrl.trim()) {
+        if (!baseUrl?.trim()) {
           ctx.ui.notify("Cancelled", "info");
           return;
         }
-        const url = baseUrl.trim().replace(/\/+$/, "");
 
-        // 4. Auto-discover models from /models endpoint
-        ctx.ui.notify("Discovering models...", "info");
-        let models: DiscoveredModel[] = [];
-        let discoverError: string | undefined;
-
-        try {
-          const modelsUrl = `${url}/models`;
-          const res = await fetch(modelsUrl, {
-            signal: AbortSignal.timeout(10_000),
-          });
-          if (!res.ok) {
-            discoverError = `HTTP ${res.status} from ${modelsUrl}`;
-          } else {
-            const body = (await res.json()) as {
-              data?: Array<{ id: string; name?: string }>;
-              object?: string;
-            };
-
-            if (body.data && Array.isArray(body.data) && body.data.length > 0) {
-              models = body.data.map((m: { id: string; name?: string }) => ({
-                id: m.id,
-                name: m.name ?? m.id,
-                vision: false,
-              }));
-              ctx.ui.notify(
-                `Found ${models.length} model(s): ${models.map((m) => m.id).join(", ")}`,
-                "info",
-              );
-            } else {
-              discoverError = "No models in response";
-            }
-          }
-        } catch (err) {
-          discoverError = err instanceof Error ? err.message : String(err);
-        }
-
-        if (discoverError) {
-          // Fallback: ask user to enter model ID manually
-          ctx.ui.notify(`Could not discover models: ${discoverError}`, "warning");
-          const manualId = await ctx.ui.input("Enter model ID manually (or leave empty to cancel):");
-          if (!manualId || !manualId.trim()) {
-            ctx.ui.notify("Cancelled", "info");
-            return;
-          }
-          models = [{ id: manualId.trim(), name: manualId.trim(), vision: false }];
-        }
-
-        // 5. Build provider definition
         const def: CustomProviderDef = {
-          id: providerId,
-          name: (displayName && displayName.trim()) || undefined,
-          baseUrl: url,
+          id: id.trim(),
+          name: displayName?.trim() || undefined,
+          baseUrl: baseUrl.trim().replace(/\/+$/, ""),
           api: "openai-completions",
-          models,
+          models: [],
         };
 
-        // 6. Save to config
+        // Save
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const existing = cfg["custom-providers"] ?? [];
-        const idx = existing.findIndex((p) => p.id === def.id);
-        if (idx >= 0) {
-          existing[idx] = def;
-        } else {
-          existing.push(def);
-        }
-        cfg["custom-providers"] = existing;
+        const list = cfg["custom-providers"] ?? [];
+        const idx = list.findIndex((p) => p.id === def.id);
+        if (idx >= 0) list[idx] = def;
+        else list.push(def);
+        cfg["custom-providers"] = list;
         await saveConfig(cfg as Record<string, boolean | string>);
 
-        // 7. Register live
-        pi.registerProvider(def.id, {
-          name: def.name ?? def.id,
-          baseUrl: def.baseUrl,
-          api: def.api,
-          models: def.models.map((m) => ({
-            id: m.id,
-            name: m.name ?? m.id,
-            reasoning: false,
-            input: m.vision ? (["text", "image"] as const) : (["text"] as const),
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: m.contextWindow ?? 128000,
-            maxTokens: m.maxTokens ?? 32768,
-          })),
-        });
+        // Register live
+        register(pi, def);
 
         ctx.ui.notify(
-          `\u2705 Provider "${providerId}" with ${models.length} model(s). Use /login to set its API key.`,
+          `Provider "${def.id}" added. Now use /login to set its API key, then /discover-models.`,
           "info",
         );
       },
     });
 
-    // ── /remove-provider command ────────────────────────────────────────
+    // ── /remove-provider ────────────────────────────────────────────────
     pi.registerCommand("remove-provider", {
-      description: "Remove a custom provider added via /add-provider",
+      description: "Remove a custom provider",
       handler: async (_args, ctx) => {
         if (ctx.mode !== "tui") {
           ctx.ui.notify("run /remove-provider from the pi prompt", "info");
@@ -195,38 +191,103 @@ export const customProviders: PowerToyFeature = {
         }
 
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const providers = cfg["custom-providers"] ?? [];
-        if (providers.length === 0) {
-          ctx.ui.notify("No custom providers to remove", "info");
+        const list = cfg["custom-providers"] ?? [];
+        if (list.length === 0) {
+          ctx.ui.notify("No custom providers", "info");
           return;
         }
 
         const choice = await ctx.ui.select(
           "Remove provider:",
-          providers.map((p) => `${p.id} - ${p.baseUrl}`),
+          list.map((p) => `${p.id} - ${p.baseUrl}`),
         );
-        if (!choice) {
-          ctx.ui.notify("Cancelled", "info");
+        if (!choice) return;
+
+        const idx = list.findIndex((p) => `${p.id} - ${p.baseUrl}` === choice);
+        if (idx === -1) return;
+
+        const removed = list[idx];
+        list.splice(idx, 1);
+        cfg["custom-providers"] = list;
+        await saveConfig(cfg as Record<string, boolean | string>);
+
+        ctx.ui.notify(`Removed "${removed.id}"`, "info");
+      },
+    });
+
+    // ── /discover-models ────────────────────────────────────────────────
+    pi.registerCommand("discover-models", {
+      description:
+        "Fetch models from a provider's /models endpoint (run after /login sets the API key).",
+      handler: async (_args, ctx) => {
+        if (ctx.mode !== "tui") {
+          ctx.ui.notify("run /discover-models from the pi prompt", "info");
           return;
         }
 
-        const selectedIdx = providers.findIndex(
-          (p) => `${p.id} - ${p.baseUrl}` === choice,
-        );
-        if (selectedIdx === -1) return;
+        const cfg = (await loadConfig()) as CustomProvidersConfig;
+        const list = cfg["custom-providers"] ?? [];
+        if (list.length === 0) {
+          ctx.ui.notify("No custom providers. Use /add-provider first.", "info");
+          return;
+        }
 
-        const removed = providers[selectedIdx];
-        providers.splice(selectedIdx, 1);
-        cfg["custom-providers"] = providers;
+        const choice = await ctx.ui.select(
+          "Discover models for:",
+          list.map((p) => {
+            const hasKey = readAuthKey(p.id).then((k) => !!k);
+            // we show a sync version below
+            return `${p.id} - ${p.baseUrl}${p.models.length > 0 ? ` (${p.models.length} models)` : ""}`;
+          }),
+        );
+        if (!choice) return;
+
+        const idx = list.findIndex(
+          (p) => choice.startsWith(p.id + " -"),
+        );
+        if (idx === -1) return;
+
+        const def = list[idx];
+
+        // Read API key from auth.json
+        const apiKey = await readAuthKey(def.id);
+        if (!apiKey) {
+          ctx.ui.notify(
+            `No API key for "${def.id}". Use /login to set one first.`,
+            "warning",
+          );
+          return;
+        }
+
+        ctx.ui.notify(`Discovering models from ${def.baseUrl}/models...`, "info");
+        const result = await discoverModels(def.baseUrl, apiKey);
+
+        if (result.error || result.models.length === 0) {
+          ctx.ui.notify(
+            `Discovery failed: ${result.error ?? "no models found"}`,
+            "error",
+          );
+          return;
+        }
+
+        // Update config
+        def.models = result.models;
+        list[idx] = def;
+        cfg["custom-providers"] = list;
         await saveConfig(cfg as Record<string, boolean | string>);
 
-        ctx.ui.notify(`Removed provider "${removed.id}"`, "info");
+        // Re-register
+        register(pi, def);
+
+        ctx.ui.notify(
+          `Found ${result.models.length} model(s) for "${def.id}": ${result.models.map((m) => m.id).join(", ")}`,
+          "info",
+        );
       },
     });
   },
 
   disable() {
-    // Providers registered via pi.registerProvider() persist until /reload.
-    // No per-session cleanup needed — disable/enable toggles startup load.
+    // Providers persist until /reload. No per-session cleanup needed.
   },
 };
