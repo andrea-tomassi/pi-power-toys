@@ -4,12 +4,18 @@ import { loadConfig, saveConfig } from "./config.ts";
 import { yellowSessionName } from "./features/yellow-session-name.ts";
 import { compactModel } from "./features/compact-model.ts";
 import { hostnameFooter } from "./features/hostname-footer.ts";
+import { customProviders } from "./features/custom-providers.ts";
 
 /**
  * Registry of all power-toy features.
  * Add new features here to make them available in /power-settings.
  */
-const features: PowerToyFeature[] = [yellowSessionName, compactModel, hostnameFooter];
+const features: PowerToyFeature[] = [
+  yellowSessionName,
+  compactModel,
+  hostnameFooter,
+  customProviders,
+];
 
 /**
  * Features that use a model selector instead of on/off toggle.
