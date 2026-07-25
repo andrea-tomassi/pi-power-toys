@@ -74,6 +74,25 @@ async function readAuthKey(providerId: string): Promise<string | undefined> {
   }
 }
 
+// Heuristic: OpenAI's /v1/models returns no capability info, so guess vision
+// from the model id/name. Covers common vision model naming conventions.
+const VISION_KEYWORDS = [
+  "vision",
+  "vl",
+  "image",
+  "multimodal",
+  "llava",
+  "cogvlm",
+  "internvl",
+];
+
+function detectVision(modelId: string): boolean {
+  const id = modelId.toLowerCase();
+  // "vl" must appear as a standalone token (e.g. qwen2-vl) not a substring
+  if (/\bvl\b/.test(id)) return true;
+  return VISION_KEYWORDS.filter((kw) => kw !== "vl").some((kw) => id.includes(kw));
+}
+
 async function discoverModels(
   baseUrl: string,
   apiKey?: string,
@@ -95,7 +114,11 @@ async function discoverModels(
     }
 
     return {
-      models: body.data.map((m) => ({ id: m.id, name: m.id, vision: false })),
+      models: body.data.map((m) => ({
+        id: m.id,
+        name: m.id,
+        vision: detectVision(m.id),
+      })),
     };
   } catch (err) {
     return { models: [], error: err instanceof Error ? err.message : String(err) };
@@ -280,7 +303,13 @@ export const customProviders: PowerToyFeature = {
         register(pi, def);
 
         ctx.ui.notify(
-          `Found ${result.models.length} model(s) for "${def.id}": ${result.models.map((m) => m.id).join(", ")}`,
+          (() => {
+            const visionM = result.models.filter((m) => m.vision);
+            const vm = visionM.length > 0
+              ? ` [vision: ${visionM.map((m) => m.id).join(", ")}]`
+              : "";
+            return `Found ${result.models.length} model(s) for "${def.id}"${vm}`;
+          })(),
           "info",
         );
       },
