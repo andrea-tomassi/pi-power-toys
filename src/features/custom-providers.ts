@@ -4,7 +4,7 @@ import { loadConfig, saveConfig } from "../config.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export interface CustomProviderModel {
+export interface DiscoveredModel {
   id: string;
   name?: string;
   vision?: boolean;
@@ -16,13 +16,11 @@ export interface CustomProviderDef {
   id: string;
   name?: string;
   baseUrl: string;
-  api?: string;
-  compat?: Record<string, unknown>;
-  models: CustomProviderModel[];
+  api: string;
+  models: DiscoveredModel[];
 }
 
 export interface CustomProvidersConfig {
-  /** Array of custom provider definitions stored in pi-power-toys.json */
   "custom-providers"?: CustomProviderDef[];
 }
 
@@ -32,163 +30,167 @@ export const customProviders: PowerToyFeature = {
   id: "custom-providers",
   label: "Custom Providers",
   description:
-    "Register custom API providers (e.g. homelab inference) that appear in /login for API key entry",
+    "Register custom API providers that appear in /login for API key entry. Models are auto-discovered from the endpoint.",
   defaultValue: true,
 
   enable(pi: ExtensionAPI, ctx: ExtensionContext) {
-    // ── Register providers from saved config on startup / reload ─────────
+    // ── Register saved providers on startup ─────────────────────────────
     (async () => {
       try {
         const cfg = (await loadConfig()) as CustomProvidersConfig;
         const providers = cfg["custom-providers"] ?? [];
         for (const p of providers) {
-          registerProviderFromDef(pi, p);
+          pi.registerProvider(p.id, {
+            name: p.name ?? p.id,
+            baseUrl: p.baseUrl,
+            api: p.api ?? "openai-completions",
+            models: p.models.map((m) => ({
+              id: m.id,
+              name: m.name ?? m.id,
+              reasoning: false,
+              input: m.vision ? (["text", "image"] as const) : (["text"] as const),
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: m.contextWindow ?? 128000,
+              maxTokens: m.maxTokens ?? 32768,
+            })),
+          });
         }
         if (providers.length > 0) {
           ctx.ui.notify(
-            `[power-toys] Registered ${providers.length} custom provider(s) — use /login to set API keys`,
+            `[power-toys] \u2190 ${providers.length} custom provider(s) loaded`,
             "info",
           );
         }
       } catch {
-        // Silently ignore — no saved config yet
+        // First run — no saved config
       }
     })();
 
     // ── /add-provider command ───────────────────────────────────────────
     pi.registerCommand("add-provider", {
-      description:
-        "Add a custom API provider (e.g. homelab inference). Shows in /login for API key entry.",
+      description: "Add a custom provider. Models are auto-discovered from the endpoint.",
       handler: async (_args, ctx) => {
         if (ctx.mode !== "tui") {
-          ctx.ui.notify("/add-provider is only available in TUI mode", "error");
+          ctx.ui.notify("run /add-provider from the pi prompt", "info");
           return;
         }
 
-        const { Container, Text, SettingsList } = await import("@earendil-works/pi-tui");
-        const { getSettingsListTheme } = await import("@earendil-works/pi-coding-agent");
+        // 1. Ask for provider ID
+        const id = await ctx.ui.input("Provider ID (e.g. my-server):");
+        if (!id || !id.trim()) {
+          ctx.ui.notify("Cancelled", "info");
+          return;
+        }
+        const providerId = id.trim();
 
-        const form: Record<string, string> = {
-          id: "",
-          name: "",
-          baseUrl: "",
-          modelId: "",
-          modelName: "",
-          vision: "false",
-          maxTokens: "32768",
-          contextWindow: "128000",
+        // 2. Ask for display name
+        const displayName = await ctx.ui.input("Display name (optional, e.g. My Server):");
+
+        // 3. Ask for base URL
+        const baseUrl = await ctx.ui.input("Base URL (e.g. https://example.com/v1):");
+        if (!baseUrl || !baseUrl.trim()) {
+          ctx.ui.notify("Cancelled", "info");
+          return;
+        }
+        const url = baseUrl.trim().replace(/\/+$/, "");
+
+        // 4. Auto-discover models from /models endpoint
+        ctx.ui.notify("Discovering models...", "info");
+        let models: DiscoveredModel[] = [];
+        let discoverError: string | undefined;
+
+        try {
+          const modelsUrl = `${url}/models`;
+          const res = await fetch(modelsUrl, {
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!res.ok) {
+            discoverError = `HTTP ${res.status} from ${modelsUrl}`;
+          } else {
+            const body = (await res.json()) as {
+              data?: Array<{ id: string; name?: string }>;
+              object?: string;
+            };
+
+            if (body.data && Array.isArray(body.data) && body.data.length > 0) {
+              models = body.data.map((m: { id: string; name?: string }) => ({
+                id: m.id,
+                name: m.name ?? m.id,
+                vision: false,
+              }));
+              ctx.ui.notify(
+                `Found ${models.length} model(s): ${models.map((m) => m.id).join(", ")}`,
+                "info",
+              );
+            } else {
+              discoverError = "No models in response";
+            }
+          }
+        } catch (err) {
+          discoverError = err instanceof Error ? err.message : String(err);
+        }
+
+        if (discoverError) {
+          // Fallback: ask user to enter model ID manually
+          ctx.ui.notify(`Could not discover models: ${discoverError}`, "warning");
+          const manualId = await ctx.ui.input("Enter model ID manually (or leave empty to cancel):");
+          if (!manualId || !manualId.trim()) {
+            ctx.ui.notify("Cancelled", "info");
+            return;
+          }
+          models = [{ id: manualId.trim(), name: manualId.trim(), vision: false }];
+        }
+
+        // 5. Build provider definition
+        const def: CustomProviderDef = {
+          id: providerId,
+          name: (displayName && displayName.trim()) || undefined,
+          baseUrl: url,
+          api: "openai-completions",
+          models,
         };
 
-        const FIELDS = [
-          { id: "id", label: "Provider ID (e.g. homelab-u24-server)" },
-          { id: "name", label: "Display name (optional, e.g. Homelab u24)" },
-          { id: "baseUrl", label: "Base URL (e.g. https://inference.anode.red/v1)" },
-          { id: "modelId", label: "Model ID (e.g. gemma4-12b-128k-vision)" },
-          { id: "modelName", label: "Model display name (optional)" },
-          { id: "vision", label: "Vision support", values: ["false", "true"] },
-          { id: "maxTokens", label: "Max tokens" },
-          { id: "contextWindow", label: "Context window" },
-        ];
+        // 6. Save to config
+        const cfg = (await loadConfig()) as CustomProvidersConfig;
+        const existing = cfg["custom-providers"] ?? [];
+        const idx = existing.findIndex((p) => p.id === def.id);
+        if (idx >= 0) {
+          existing[idx] = def;
+        } else {
+          existing.push(def);
+        }
+        cfg["custom-providers"] = existing;
+        await saveConfig(cfg as Record<string, boolean | string>);
 
-        let saved = false;
-
-        await ctx.ui.custom((_tui, theme, _keybindings, done) => {
-          const container = new Container();
-          container.addChild(new Text(theme.fg("accent", theme.bold("\u2699 Add Provider")), 1, 0));
-
-          const items = FIELDS.map((f) => ({
-            id: f.id,
-            label: f.label,
-            currentValue: form[f.id],
-            values: f.values ?? [],
-          }));
-
-          const list = new SettingsList(
-            items,
-            Math.min(items.length + 2, 20),
-            getSettingsListTheme(),
-            async (id: string, newValue: string) => {
-              form[id] = newValue;
-            },
-            async () => {
-              // On close, save provider if form has required fields
-              if (!form.id || !form.baseUrl || !form.modelId) {
-                ctx.ui.notify(
-                  "Provider not saved — id, baseUrl, and modelId are required",
-                  "warning",
-                );
-                done(undefined);
-                return;
-              }
-
-              const def: CustomProviderDef = {
-                id: form.id,
-                name: form.name || undefined,
-                baseUrl: form.baseUrl,
-                api: "openai-completions",
-                compat: { streaming: false },
-                models: [
-                  {
-                    id: form.modelId,
-                    name: form.modelName || undefined,
-                    vision: form.vision === "true",
-                    maxTokens: parseInt(form.maxTokens) || 32768,
-                    contextWindow: parseInt(form.contextWindow) || 128000,
-                  },
-                ],
-              };
-
-              // Save to config
-              const cfg = (await loadConfig()) as CustomProvidersConfig;
-              const existing = cfg["custom-providers"] ?? [];
-              const idx = existing.findIndex((p) => p.id === def.id);
-              if (idx >= 0) {
-                existing[idx] = def;
-              } else {
-                existing.push(def);
-              }
-              cfg["custom-providers"] = existing;
-              await saveConfig(cfg as Record<string, boolean | string>);
-
-              // Register the provider live
-              registerProviderFromDef(pi, def);
-
-              saved = true;
-              done(undefined);
-            },
-          );
-
-          container.addChild(list);
-          container.addChild(
-            new Text(
-              theme.fg("dim", "\u2191\u2193 navigate \u2022 enter edit \u2022 esc save & close"),
-              1,
-              0,
-            ),
-          );
-
-          return {
-            render: (w: number) => container.render(w),
-            invalidate: () => container.invalidate(),
-            handleInput: (data: string) => list.handleInput?.(data),
-          };
+        // 7. Register live
+        pi.registerProvider(def.id, {
+          name: def.name ?? def.id,
+          baseUrl: def.baseUrl,
+          api: def.api,
+          models: def.models.map((m) => ({
+            id: m.id,
+            name: m.name ?? m.id,
+            reasoning: false,
+            input: m.vision ? (["text", "image"] as const) : (["text"] as const),
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: m.contextWindow ?? 128000,
+            maxTokens: m.maxTokens ?? 32768,
+          })),
         });
 
-        if (saved) {
-          ctx.ui.notify(
-            `\u2705 Provider "${form.id}" registered. Use /login to set its API key.`,
-            "info",
-          );
-        }
+        ctx.ui.notify(
+          `\u2705 Provider "${providerId}" with ${models.length} model(s). Use /login to set its API key.`,
+          "info",
+        );
       },
     });
 
     // ── /remove-provider command ────────────────────────────────────────
     pi.registerCommand("remove-provider", {
-      description: "Remove a custom provider that was added via /add-provider",
+      description: "Remove a custom provider added via /add-provider",
       handler: async (_args, ctx) => {
         if (ctx.mode !== "tui") {
-          ctx.ui.notify("/remove-provider is only available in TUI mode", "error");
+          ctx.ui.notify("run /remove-provider from the pi prompt", "info");
           return;
         }
 
@@ -201,12 +203,15 @@ export const customProviders: PowerToyFeature = {
 
         const choice = await ctx.ui.select(
           "Remove provider:",
-          providers.map((p) => `${p.id} \u2014 ${p.baseUrl}`),
+          providers.map((p) => `${p.id} - ${p.baseUrl}`),
         );
-        if (!choice) return;
+        if (!choice) {
+          ctx.ui.notify("Cancelled", "info");
+          return;
+        }
 
         const selectedIdx = providers.findIndex(
-          (p) => `${p.id} \u2014 ${p.baseUrl}` === choice,
+          (p) => `${p.id} - ${p.baseUrl}` === choice,
         );
         if (selectedIdx === -1) return;
 
@@ -215,40 +220,13 @@ export const customProviders: PowerToyFeature = {
         cfg["custom-providers"] = providers;
         await saveConfig(cfg as Record<string, boolean | string>);
 
-        ctx.ui.notify(`\u274c Removed provider "${removed.id}"`, "info");
+        ctx.ui.notify(`Removed provider "${removed.id}"`, "info");
       },
     });
   },
 
   disable() {
-    // Providers are registered via pi.registerProvider which is global;
-    // a full reload (/reload) clears them. No per-session cleanup needed.
+    // Providers registered via pi.registerProvider() persist until /reload.
+    // No per-session cleanup needed — disable/enable toggles startup load.
   },
 };
-
-// ── Helper ─────────────────────────────────────────────────────────────────
-
-function registerProviderFromDict(
-  pi: ExtensionAPI,
-  def: CustomProviderDef,
-): void {
-  const api = def.api ?? "openai-completions";
-
-  pi.registerProvider(def.id, {
-    name: def.name ?? def.id,
-    baseUrl: def.baseUrl,
-    api,
-    models: def.models.map((m) => ({
-      id: m.id,
-      name: m.name ?? m.id,
-      reasoning: false,
-      input: m.vision ? (["text", "image"] as const) : (["text"] as const),
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: m.contextWindow ?? 128000,
-      maxTokens: m.maxTokens ?? 32768,
-    })),
-  });
-}
-
-// Export with alias for clarity
-const registerProviderFromDef = registerProviderFromDict;
