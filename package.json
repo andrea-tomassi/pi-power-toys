@@ -1,6 +1,6 @@
 {
   "name": "pi-power-toys",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Power-user customizations for the Pi coding agent — yellow session names in the footer, a /power-settings toggle menu, and more.",
   "type": "module",
   "files": [
