@@ -23,6 +23,9 @@ const features: PowerToyFeature[] = [
  */
 const MODEL_SELECTOR_FEATURES = new Set(["compact-model"]);
 
+/** Features that store complex config (objects/arrays) — skip the on/off toggle UI. */
+const COMPLEX_CONFIG_FEATURES = new Set(["custom-providers"]);
+
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
 
@@ -63,7 +66,9 @@ export default function (pi: ExtensionAPI) {
         container.addChild(new Text(theme.fg("accent", theme.bold("\u26a1 Pi Power Toys")), 1, 0));
 
         // Build settings items — model-selector features get a model list, others get on/off
-        const items = features.map(
+        const items = features
+          .filter((f) => !COMPLEX_CONFIG_FEATURES.has(f.id))
+          .map(
           (feature): { id: string; label: string; currentValue: string; values: string[] } => {
             if (MODEL_SELECTOR_FEATURES.has(feature.id)) {
               // Build model list from available models

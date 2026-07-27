@@ -139,7 +139,8 @@ export const customProviders: PowerToyFeature = {
     (async () => {
       try {
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const providers = cfg["custom-providers"] ?? [];
+        const rawStartup = cfg["custom-providers"];
+        const providers: CustomProviderDef[] = Array.isArray(rawStartup) ? rawStartup : [];
         for (const p of providers) {
           register(pi, p);
         }
@@ -187,7 +188,8 @@ export const customProviders: PowerToyFeature = {
 
         // Save
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const list = cfg["custom-providers"] ?? [];
+        const raw = cfg["custom-providers"];
+        const list: CustomProviderDef[] = Array.isArray(raw) ? raw : [];
         const idx = list.findIndex((p) => p.id === def.id);
         if (idx >= 0) list[idx] = def;
         else list.push(def);
@@ -214,7 +216,8 @@ export const customProviders: PowerToyFeature = {
         }
 
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const list = cfg["custom-providers"] ?? [];
+        const rawRemove = cfg["custom-providers"];
+        const list: CustomProviderDef[] = Array.isArray(rawRemove) ? rawRemove : [];
         if (list.length === 0) {
           ctx.ui.notify("No custom providers", "info");
           return;
@@ -249,7 +252,8 @@ export const customProviders: PowerToyFeature = {
         }
 
         const cfg = (await loadConfig()) as CustomProvidersConfig;
-        const list = cfg["custom-providers"] ?? [];
+        const rawDiscover = cfg["custom-providers"];
+        const list: CustomProviderDef[] = Array.isArray(rawDiscover) ? rawDiscover : [];
         if (list.length === 0) {
           ctx.ui.notify("No custom providers. Use /add-provider first.", "info");
           return;
