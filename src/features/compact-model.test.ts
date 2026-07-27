@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseModelKey } from "./compact-model.ts";
+import { parseModelKey } from "./parse-model-key.ts";
 
 describe("parseModelKey", () => {
   it("parses a valid provider:model_id key", () => {

@@ -3,15 +3,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
 import type { PowerToyFeature } from "../types.ts";
 import { loadConfig } from "../config.ts";
-
-/**
- * Parse a model key "provider:model_id" into [provider, modelId].
- */
-export function parseModelKey(key: string): [string, string] | null {
-  const sep = key.indexOf(":");
-  if (sep === -1 || sep === 0 || sep === key.length - 1) return null;
-  return [key.slice(0, sep), key.slice(sep + 1)];
-}
+import { parseModelKey } from "./parse-model-key.ts";
 
 export const compactModel: PowerToyFeature = {
   id: "compact-model",
