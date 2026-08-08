@@ -167,12 +167,43 @@ ${conversationText}
         },
       ];
 
+      // opencode-go gateway ("Console Go") requires attribution headers for correct
+      // upstream routing — without x-opencode-client the model is reported unavailable.
+      // The agent runtime injects these via mergeProviderAttributionHeaders
+      // (core/provider-attribution.js); complete() does not, so we add them here.
+      const compactSessionId = uuidv7();
+      const isOpencodeProvider =
+        model.provider === "opencode" ||
+        model.provider === "opencode-go" ||
+        (typeof model.baseUrl === "string" && model.baseUrl.includes("opencode.ai"));
+      const attributionHeaders = isOpencodeProvider
+        ? { "x-opencode-client": "pi", "x-opencode-session": compactSessionId }
+        : undefined;
+
       try {
         const response = await ctx.modelRegistry.complete(
           model,
           { messages: summaryMessages },
-          { maxTokens: 8192, signal, cacheRetention: "none", sessionId: uuidv7() },
+          {
+            maxTokens: 8192,
+            signal,
+            cacheRetention: "none",
+            sessionId: compactSessionId,
+            headers: attributionHeaders,
+          },
         );
+
+        // Surface the real upstream error instead of a misleading "empty summary"
+        if (response.stopReason === "error") {
+          if (!signal.aborted) {
+            const errMsg = response.errorMessage;
+            ctx.ui.notify(
+              `[compact-model] Model error (${displayKey}): ${errMsg ?? "unknown error"}. Using default compaction.`,
+              "warning",
+            );
+          }
+          return;
+        }
 
         const summary = response.content
           .filter((c): c is { type: "text"; text: string } => c.type === "text")
@@ -180,11 +211,14 @@ ${conversationText}
           .join("\n");
 
         if (!summary.trim()) {
-          if (!signal.aborted)
+          if (!signal.aborted) {
+            const blockTypes =
+              response.content.map((c) => c.type).join(", ") || "(none)";
             ctx.ui.notify(
-              `[compact-model] Summary was empty. Using default compaction.`,
+              `[compact-model] Summary was empty (stopReason: ${response.stopReason}, blocks: [${blockTypes}]). Using default compaction.`,
               "warning",
             );
+          }
           return;
         }
 

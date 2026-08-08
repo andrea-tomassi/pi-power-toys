@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-08
+
+### Fixed
+- **compact-model** — opencode-go gateway returned `"Model is unavailable"` for custom compact models because `complete()` did not send the `x-opencode-client`/`x-opencode-session` attribution headers that the agent runtime injects via `mergeProviderAttributionHeaders`. These headers are now added for `opencode`/`opencode-go` providers and passed through `complete()`'s `headers` option.
+- **compact-model** — summary came back empty because reasoning was enabled (`reasoning_effort: "high"`), causing the model to emit only thinking blocks with no text. Reasoning is now disabled for the summarization task (a summary needs no chain-of-thought).
+- **compact-model** — surface real upstream errors (`stopReason: "error"` + `errorMessage`) and report `stopReason`/block types when a summary is empty, instead of a misleading generic "empty summary" warning.
+
 ## [0.2.0] - 2026-06-27
 
 ### Changed
@@ -35,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration persistence in `~/.pi/agent/pi-power-toys.json`
 - Pluggable feature architecture via `PowerToyFeature` interface
 
-[Unreleased]: https://github.com/andrea-tomassi/pi-power-toys/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/andrea-tomassi/pi-power-toys/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/andrea-tomassi/pi-power-toys/releases/tag/v0.3.1
 [0.1.1]: https://github.com/andrea-tomassi/pi-power-toys/releases/tag/v0.1.1
 [0.1.0]: https://github.com/andrea-tomassi/pi-power-toys/releases/tag/v0.1.0
