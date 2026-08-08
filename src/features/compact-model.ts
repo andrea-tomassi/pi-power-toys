@@ -1,4 +1,4 @@
-import { complete } from "@earendil-works/pi-ai";
+import { uuidv7 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
 import type { PowerToyFeature } from "../types.ts";
@@ -168,16 +168,10 @@ ${conversationText}
       ];
 
       try {
-        const finalAuth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-        const response = await complete(
+        const response = await ctx.modelRegistry.complete(
           model,
           { messages: summaryMessages },
-          {
-            apiKey: finalAuth.ok ? finalAuth.apiKey : undefined,
-            headers: finalAuth.ok ? finalAuth.headers : undefined,
-            maxTokens: 8192,
-            signal,
-          },
+          { maxTokens: 8192, signal, cacheRetention: "none", sessionId: uuidv7() },
         );
 
         const summary = response.content
@@ -201,6 +195,7 @@ ${conversationText}
             summary,
             firstKeptEntryId,
             tokensBefore,
+            usage: response.usage,
           },
         };
       } catch (error) {
