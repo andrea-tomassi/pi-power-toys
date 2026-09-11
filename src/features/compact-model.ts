@@ -13,8 +13,20 @@ export const compactModel: PowerToyFeature = {
   defaultValue: false,
 
   enable(pi: ExtensionAPI, ctx: ExtensionContext) {
+    // Dedupe identical warnings within a short window — overflow recovery may
+    // re-fire this handler several times in quick succession.
+    let lastWarning = "";
+    let lastWarningAt = 0;
+    const warn = (msg: string) => {
+      const now = Date.now();
+      if (msg === lastWarning && now - lastWarningAt < 5000) return;
+      lastWarning = msg;
+      lastWarningAt = now;
+      ctx.ui.notify(msg, "warning");
+    };
+
     pi.on("session_before_compact", async (event, ctx) => {
-      const { preparation, signal } = event;
+      const { preparation, signal, reason } = event;
       const {
         messagesToSummarize,
         turnPrefixMessages,
@@ -26,16 +38,24 @@ export const compactModel: PowerToyFeature = {
       // Read the configured compact model from power-toys config
       const cfg = await loadConfig();
       const raw = cfg["compact-model"];
-      const modelKey = typeof raw === "string" ? raw : undefined;
 
-      // If not set to a string (could be true/false), skip — use default compaction
+      // "off" (or non-string) means the feature is disabled — silent exit.
+      // Overflow recovery may re-fire this handler after the user toggled
+      // the feature off mid-recovery; that is not an error.
+      const modelKey = typeof raw === "string" && raw !== "off" ? raw : undefined;
       if (typeof modelKey !== "string") return;
+
+      const reasonLabel =
+        reason === "manual"
+          ? "manual"
+          : reason === "threshold"
+            ? "context threshold"
+            : "overflow recovery";
 
       const parsed = parseModelKey(modelKey);
       if (!parsed) {
-        ctx.ui.notify(
-          `[compact-model] Invalid model key "${modelKey}", expected "provider:model_id". Falling back to default.`,
-          "warning",
+        warn(
+          `[compact-model] Invalid model key "${modelKey}", expected "provider:model_id". Falling back to default compaction.`,
         );
         return;
       }
@@ -48,15 +68,13 @@ export const compactModel: PowerToyFeature = {
       // Fallback to session model if configured model not found
       if (!model) {
         if (ctx.model) {
-          ctx.ui.notify(
-            `[compact-model] "${modelKey}" not found. Falling back to session model ${ctx.model.provider}:${ctx.model.id}`,
-            "warning",
+          warn(
+            `[compact-model] "${modelKey}" not found → falling back to session model ${ctx.model.provider}:${ctx.model.id}`,
           );
           model = ctx.model;
         } else {
-          ctx.ui.notify(
-            `[compact-model] "${modelKey}" not found and no session model available. Using default compaction.`,
-            "warning",
+          warn(
+            `[compact-model] "${modelKey}" not found and no session model available → using default compaction.`,
           );
           return;
         }
@@ -67,46 +85,34 @@ export const compactModel: PowerToyFeature = {
       if (!auth.ok) {
         // Try fallback to session model
         if (model !== ctx.model && ctx.model) {
-          ctx.ui.notify(
-            `[compact-model] No auth for ${model.provider}:${model.id}. Falling back to session model.`,
-            "warning",
+          warn(
+            `[compact-model] No auth for ${model.provider}:${model.id} → falling back to session model.`,
           );
           model = ctx.model;
           const fallbackAuth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
           if (!fallbackAuth.ok || !fallbackAuth.apiKey) {
-            ctx.ui.notify(
-              `[compact-model] No auth for fallback model either. Using default compaction.`,
-              "warning",
-            );
+            warn(`[compact-model] No auth for fallback model either → using default compaction.`);
             return;
           }
         } else {
-          ctx.ui.notify(
-            `[compact-model] Auth failed: ${auth.error}. Using default compaction.`,
-            "warning",
-          );
+          warn(`[compact-model] Auth failed: ${auth.error} → using default compaction.`);
           return;
         }
       } else if (!auth.apiKey && !ctx.modelRegistry.isUsingOAuth(model)) {
         // No API key and not OAuth — try fallback
         if (model !== ctx.model && ctx.model) {
-          ctx.ui.notify(
-            `[compact-model] No API key for ${model.provider}:${model.id}. Falling back to session model.`,
-            "warning",
+          warn(
+            `[compact-model] No API key for ${model.provider}:${model.id} → falling back to session model.`,
           );
           model = ctx.model;
           const fallbackAuth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
           if (!fallbackAuth.ok || !fallbackAuth.apiKey) {
-            ctx.ui.notify(
-              `[compact-model] No auth for fallback model. Using default compaction.`,
-              "warning",
-            );
+            warn(`[compact-model] No auth for fallback model → using default compaction.`);
             return;
           }
         } else {
-          ctx.ui.notify(
-            `[compact-model] No API key for ${model.provider}:${model.id}. Using default compaction.`,
-            "warning",
+          warn(
+            `[compact-model] No API key for ${model.provider}:${model.id} → using default compaction.`,
           );
           return;
         }
@@ -116,7 +122,7 @@ export const compactModel: PowerToyFeature = {
       const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
 
       ctx.ui.notify(
-        `[compact-model] Compacting ${tokensBefore.toLocaleString()} tokens with ${displayKey}...`,
+        `[compact-model] Compacting ${tokensBefore.toLocaleString()} tokens with ${displayKey} (${reasonLabel})...`,
         "info",
       );
 
@@ -128,9 +134,8 @@ export const compactModel: PowerToyFeature = {
       // the entries before the cut are all metadata (model_change,
       // thinking_level_change, etc.) with no summarizable content.
       if (!conversationText.trim()) {
-        ctx.ui.notify(
-          `[compact-model] Serialized conversation is empty (${tokensBefore.toLocaleString()} tokens reported, ${allMessages.length} messages). Falling back to default compaction.`,
-          "warning",
+        warn(
+          `[compact-model] Serialized conversation is empty (${tokensBefore.toLocaleString()} tokens reported, ${allMessages.length} messages) → falling back to default compaction.`,
         );
         return;
       }
@@ -197,9 +202,8 @@ ${conversationText}
         if (response.stopReason === "error") {
           if (!signal.aborted) {
             const errMsg = response.errorMessage;
-            ctx.ui.notify(
-              `[compact-model] Model error (${displayKey}): ${errMsg ?? "unknown error"}. Using default compaction.`,
-              "warning",
+            warn(
+              `[compact-model] Model error (${displayKey}): ${errMsg ?? "unknown error"} → using default compaction.`,
             );
           }
           return;
@@ -214,9 +218,8 @@ ${conversationText}
           if (!signal.aborted) {
             const blockTypes =
               response.content.map((c) => c.type).join(", ") || "(none)";
-            ctx.ui.notify(
-              `[compact-model] Summary was empty (stopReason: ${response.stopReason}, blocks: [${blockTypes}]). Using default compaction.`,
-              "warning",
+            warn(
+              `[compact-model] Summary was empty (stopReason: ${response.stopReason}, blocks: [${blockTypes}]) → using default compaction.`,
             );
           }
           return;
@@ -233,11 +236,9 @@ ${conversationText}
           },
         };
       } catch (error) {
+        if (signal.aborted) return; // user cancelled — not an error
         const message = error instanceof Error ? error.message : String(error);
-        ctx.ui.notify(
-          `[compact-model] Compaction failed: ${message}. Falling back to default.`,
-          "warning",
-        );
+        warn(`[compact-model] Compaction failed: ${message} → falling back to default.`);
         return;
       }
     });
