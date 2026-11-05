@@ -23,7 +23,7 @@ describe("loadConfig", () => {
 
   it("returns parsed config from valid JSON", async () => {
     const path = join(tempDir, "config.json");
-    const data: PowerToyConfig = { "yellow-session-name": true, "compact-model": "off" };
+    const data: PowerToyConfig = { "yellow-session-name": true, "hostname-footer": false };
     await saveConfig(data, path);
 
     const cfg = await loadConfig(path);
@@ -51,7 +51,7 @@ describe("saveConfig", () => {
 
   it("creates parent directories if they don't exist", async () => {
     const path = join(tempDir, "nested", "deep", "config.json");
-    const data: PowerToyConfig = { "compact-model": "anthropic:claude-sonnet-4-20250514" };
+    const data: PowerToyConfig = { "yellow-session-name": true, "hostname-footer": true };
     await saveConfig(data, path);
 
     // File should exist

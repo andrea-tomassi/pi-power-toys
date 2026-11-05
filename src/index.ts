@@ -2,29 +2,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { PowerToyFeature } from "./types.ts";
 import { loadConfig, saveConfig } from "./config.ts";
 import { yellowSessionName } from "./features/yellow-session-name.ts";
-import { compactModel } from "./features/compact-model.ts";
 import { hostnameFooter } from "./features/hostname-footer.ts";
-import { customProviders } from "./features/custom-providers.ts";
 
 /**
  * Registry of all power-toy features.
  * Add new features here to make them available in /power-settings.
  */
-const features: PowerToyFeature[] = [
-  yellowSessionName,
-  compactModel,
-  hostnameFooter,
-  customProviders,
-];
-
-/**
- * Features that use a model selector instead of on/off toggle.
- * Their config value is a "provider:model_id" string or "off".
- */
-const MODEL_SELECTOR_FEATURES = new Set(["compact-model"]);
-
-/** Features that store complex config (objects/arrays) — skip the on/off toggle UI. */
-const COMPLEX_CONFIG_FEATURES = new Set(["custom-providers"]);
+const features: PowerToyFeature[] = [yellowSessionName, hostnameFooter];
 
 export default function (pi: ExtensionAPI) {
   const config = loadConfig();
@@ -36,12 +20,7 @@ export default function (pi: ExtensionAPI) {
     const cfg = await config;
     for (const feature of features) {
       const val = cfg[feature.id];
-      let enabled: boolean;
-      if (MODEL_SELECTOR_FEATURES.has(feature.id)) {
-        enabled = typeof val === "string" && val !== "off";
-      } else {
-        enabled = typeof val === "boolean" ? val : feature.defaultValue;
-      }
+      const enabled = typeof val === "boolean" ? val : feature.defaultValue;
       if (enabled) {
         feature.enable(pi, ctx);
       }
@@ -65,60 +44,32 @@ export default function (pi: ExtensionAPI) {
         // Header
         container.addChild(new Text(theme.fg("accent", theme.bold("\u26a1 Pi Power Toys")), 1, 0));
 
-        // Build settings items — model-selector features get a model list, others get on/off
-        const items = features
-          .filter((f) => !COMPLEX_CONFIG_FEATURES.has(f.id))
-          .map(
-          (feature): { id: string; label: string; currentValue: string; values: string[] } => {
-            if (MODEL_SELECTOR_FEATURES.has(feature.id)) {
-              // Build model list from available models
-              const availableModels = ctx.modelRegistry.getAvailable();
-              const modelKeys = availableModels.map((m) => `${m.provider}:${m.id}`);
-              const rawCfg = cfg[feature.id];
-              const currentValue: string = typeof rawCfg === "string" ? rawCfg : "off";
-              return {
-                id: feature.id,
-                label: feature.label,
-                currentValue,
-                values: ["off", ...modelKeys],
-              };
-            }
-            const val =
-              typeof cfg[feature.id] === "boolean" ? cfg[feature.id] : feature.defaultValue;
-            return {
-              id: feature.id,
-              label: feature.label,
-              currentValue: String(val ? "on" : "off"),
-              values: ["on", "off"],
-            };
-          },
-        );
+        // Build settings items — every feature is a plain on/off toggle
+        const items = features.map((feature) => {
+          const val = typeof cfg[feature.id] === "boolean" ? cfg[feature.id] : feature.defaultValue;
+          return {
+            id: feature.id,
+            label: feature.label,
+            currentValue: String(val ? "on" : "off"),
+            values: ["on", "off"],
+          };
+        });
 
         const settingsList = new SettingsList(
           items,
           Math.min(items.length + 2, 15),
           getSettingsListTheme(),
           async (id: string, newValue: string) => {
-            cfg[id] = newValue;
+            cfg[id] = newValue === "on";
             await saveConfig(cfg);
 
             const feature = features.find((f) => f.id === id);
             if (feature) {
               try {
-                if (MODEL_SELECTOR_FEATURES.has(id)) {
-                  // Model-selector features: enable if not "off", disable otherwise
-                  if (newValue !== "off") {
-                    feature.enable(pi, ctx);
-                  } else {
-                    feature.disable(pi, ctx);
-                  }
+                if (newValue === "on") {
+                  feature.enable(pi, ctx);
                 } else {
-                  const enabled = newValue === "on";
-                  if (enabled) {
-                    feature.enable(pi, ctx);
-                  } else {
-                    feature.disable(pi, ctx);
-                  }
+                  feature.disable(pi, ctx);
                 }
               } catch (err) {
                 ctx.ui.notify(

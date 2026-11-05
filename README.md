@@ -4,7 +4,7 @@
 
 **Power-user customizations for the [Pi](https://pi.dev) coding agent**
 
-Yellow session names, dedicated compaction models, hostname in the footer —
+Yellow session names, hostname in the footer —
 small, focused features that Pi doesn't ship natively.
 
 [![npm version](https://img.shields.io/npm/v/pi-power-toys.svg)](https://www.npmjs.com/package/pi-power-toys)
@@ -48,14 +48,6 @@ No more guessing which session you're in.
                        ^^^^^^^^^^^^^^^^^^^^ yellow
 ```
 
-### 🧠 Compact Model
-
-Use a dedicated model for context compaction, independent of the active conversation model.
-
-- Run your conversation on a strong model, compact on a cheaper one
-- Model picker integrated into `/power-settings`
-- Falls back to the session model if the configured model is unavailable
-
 ### 🖥️ Hostname in Footer
 
 Shows the machine hostname in the footer status line — instantly know which
@@ -69,7 +61,6 @@ Type `/power-settings` in Pi to open the interactive toggle menu:
 Power Toys Settings
 
   🟡 Yellow Session Name          [ON]
-  🧠 Compact Model                [off]
   🖥️ Hostname in Footer           [ON]
 ```
 
@@ -80,12 +71,9 @@ Changes apply immediately and are saved to `~/.pi/agent/pi-power-toys.json`.
 ```json
 {
   "yellow-session-name": true,
-  "compact-model": "off",
   "hostname-footer": true
 }
 ```
-
-`compact-model` accepts a `"provider:model_id"` string instead of a boolean.
 
 ## Development
 
